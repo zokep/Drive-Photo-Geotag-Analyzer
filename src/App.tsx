@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google'
-import { Acct, Ocr, Result, Row, scanAll, datasets } from './scan'
+import { Acct, Ocr, Result, Row, scanAll, datasets, SEP } from './scan'
 import { exportXlsx, exportCsv, SHEETS } from './exporter'
 import MapView from './MapView'
 
@@ -23,6 +23,27 @@ function Table({ data }: { data: Row[] }) {
   )
 }
 
+const GT = ['foto', 'docs', 'wilayah', 'teks']
+const lbl = (p: string) => (p.includes(SEP) ? p : '(Root) ' + p)
+function keyOf(r: Row, mode: string) {
+  const p = String(r.folder ?? '')
+  if (mode === 'akun') return r.akun
+  if (mode === 'dokumen') return r.dokumen || r.nama?.split(' › ')[0] || '(file foto biasa)'
+  return r.akun + ' | ' + (mode === 'utama' ? p.split(SEP).slice(0, 2).join(SEP) : p)
+}
+function Grouped({ data, mode }: { data: Row[]; mode: string }) {
+  const g = new Map<string, Row[]>(); for (const r of data) { const k = keyOf(r, mode); (g.get(k) || g.set(k, []).get(k)!).push(r) }
+  return <>{[...g.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([k, v]) => {
+    const y = v.filter(x => x.berkoordinat === 'YA').length, hasK = v.some(x => x.berkoordinat), i = k.indexOf(' | ')
+    const name = mode === 'folder' || mode === 'utama' ? `${lbl(k.slice(i + 3))}  ·  ${k.slice(0, i)}` : k
+    return (
+      <details key={k} open={g.size <= 3} style={{ marginBottom: 8 }}>
+        <summary style={{ cursor: 'pointer', padding: 6 }}><b>📁 {name}</b> — {v.length} baris{hasK && <> · <span className="okt">✔ {y} berkoordinat</span> · <span className="not">✖ {v.length - y} tanpa</span></>}</summary>
+        <Table data={v} />
+      </details>)
+  })}</>
+}
+
 function Inner() {
   const [accts, setAccts] = useState<Acct[]>([])
   const [res, setRes] = useState<Result>(EMPTY)
@@ -30,6 +51,7 @@ function Inner() {
   const [geo, setGeo] = useState(true)
   const [ocr, setOcr] = useState<Ocr>('missing')
   const [fk, setFk] = useState('semua'), [fs, setFs] = useState('semua'), [q, setQ] = useState('')
+  const [fd, setFd] = useState(''), [sub, setSub] = useState(true), [grp, setGrp] = useState('folder'), [ocrMax, setOcrMax] = useState(300)
   const [busy, setBusy] = useState(false), [st, setSt] = useState('Belum berjalan.'), [pct, setPct] = useState(0)
 
   const login = useGoogleLogin({
@@ -45,7 +67,7 @@ function Inner() {
   async function scan() {
     setBusy(true)
     try {
-      const r = await scanAll(accts, { geo, ocr }, (t, p) => { setSt(t); if (p) setPct(p) })
+      const r = await scanAll(accts, { geo, ocr, ocrMax }, (t, p) => { setSt(t); if (p) setPct(p) })
       setRes(r); setPct(100); setSt(`Selesai: ${r.rows.length} foto, ${r.docs.length} dokumen, ${r.wilayah.length} temuan wilayah/luasan.`)
     } catch (e: any) { setSt('Error: ' + e.message) }
     setBusy(false)
@@ -56,10 +78,12 @@ function Inner() {
   const rows = useMemo(() => {
     if (tab === 'peta') return []
     let a = d[tab] as Row[]
+    if (fd && GT.includes(tab)) { const i = fd.indexOf('|'), ak = fd.slice(0, i), p = fd.slice(i + 1); a = a.filter(r => r.akun === ak && (r.folder === p || (sub && String(r.folder).startsWith(p + SEP)))) }
     if (tab === 'foto') a = a.filter(r => (fk === 'semua' || r.berkoordinat === fk) && (fs === 'semua' || (fs === 'File') === (r.sumber === 'File')))
     const ql = q.trim().toLowerCase()
     return ql ? a.filter(r => Object.entries(r).some(([k, v]) => k !== 'exif_lengkap' && String(v).toLowerCase().includes(ql))) : a
-  }, [d, tab, fk, fs, q])
+  }, [d, tab, fk, fs, q, fd, sub])
+  const FO = useMemo(() => [...res.folders].sort(), [res])
   const go = (t: Tab, k = 'semua', s = 'semua') => { setTab(t); setFk(k); setFs(s) }
 
   return (
@@ -86,6 +110,7 @@ function Inner() {
             <select value={ocr} onChange={e => setOcr(e.target.value as Ocr)}>
               <option value="off">Mati (cepat)</option><option value="missing">Hanya foto tanpa koordinat/waktu EXIF</option><option value="all">Semua foto (lambat)</option>
             </select></label>
+          <label>Batas OCR/dokumen: <input type="number" min={1} max={2000} value={ocrMax} onChange={e => setOcrMax(+e.target.value || 300)} style={{ width: 70 }} /></label>
         </div>
         <div className="bar"><i style={{ width: pct + '%' }} /></div><div className="m">{st}</div>
       </div>
@@ -121,9 +146,15 @@ function Inner() {
               {tab === 'foto' && <>
                 <select value={fk} onChange={e => setFk(e.target.value)}><option value="semua">Semua koordinat</option><option value="YA">✔ Berkoordinat</option><option value="TIDAK">✖ Tanpa koordinat</option></select>
                 <select value={fs} onChange={e => setFs(e.target.value)}><option value="semua">Semua sumber</option><option value="File">File foto</option><option value="dok">Dalam dokumen</option></select></>}
+              {GT.includes(tab) && <>
+                <select value={fd} onChange={e => setFd(e.target.value)}><option value="">Semua folder</option>
+                  {FO.map(k => { const i = k.indexOf('|'), p = k.slice(i + 1); return <option key={k} value={k}>{lbl(p)}{accts.length > 1 ? ` — ${k.slice(0, i)}` : ''}</option> })}</select>
+                <label><input type="checkbox" checked={sub} onChange={e => setSub(e.target.checked)} /> termasuk subfolder</label>
+                <select value={grp} onChange={e => setGrp(e.target.value)}><option value="tidak">Tanpa grup</option><option value="folder">Grup: per folder/subfolder (+Root)</option>
+                  <option value="utama">Grup: per folder utama</option><option value="akun">Grup: per akun</option><option value="dokumen">Grup: per dokumen</option></select></>}
               <span className="m">{rows.length} baris</span>
             </div>
-            <Table data={rows} />
+            {GT.includes(tab) && grp !== 'tidak' ? <Grouped data={rows} mode={grp} /> : <Table data={rows} />}
           </>)}
       </div>
     </div>

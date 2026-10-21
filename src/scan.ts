@@ -63,7 +63,7 @@ export function exRow(j: Job, ex: any, m: any, extra: Row = {}): Row {
     waktu: ft(ex.DateTimeOriginal || ex.CreateDate || m.time || ''), detail_timestamp: ts,
     kamera: [ex.Make || m.cameraMake, ex.Model || m.cameraModel].filter(Boolean).join(' '), lensa: ex.LensModel || m.lens || '',
     lebar: ex.ExifImageWidth || m.width || '', tinggi: ex.ExifImageHeight || m.height || '', keterangan: ket,
-    alamat: '', kelurahan: '', kecamatan: '', kota: '', provinsi: '', ocr_teks: '', ocr_waktu: '', ocr_koordinat: '', ocr_alamat: '', teks_sekitar: '', halaman: '', exif_lengkap: js(ex), ...extra })
+    alamat: '', kelurahan: '', kecamatan: '', kota: '', provinsi: '', ocr_status: '', ocr_teks: '', ocr_waktu: '', ocr_koordinat: '', ocr_alamat: '', teks_sekitar: '', halaman: '', exif_lengkap: js(ex), ...extra })
 }
 
 async function procImg(j: Job, res: Result, ocr: Ocr) {
@@ -74,7 +74,7 @@ async function procImg(j: Job, res: Result, ocr: Ocr) {
     try {
       const t = await ocrBuffer(await dl(j.a, j.f.id, false), j.f.mimeType || 'image/jpeg'); applyOcr(r, t)
       for (const w of extractRegion(t)) res.wilayah.push({ akun: j.a.email, folder: j.path, dokumen: j.f.name, sumber_teks: 'OCR foto', halaman: '', ...w })
-    } catch (e: any) { r.ocr_error = String(e.message || e) }
+    } catch (e: any) { r.ocr_error = String(e.message || e); r.ocr_status = 'Gagal OCR' }
   }
   res.rows.push(r)
 }
@@ -96,7 +96,7 @@ async function geocode(rows: Row[], prog: Prog) {
   }
 }
 
-export async function scanAll(accts: Acct[], opt: { geo: boolean; ocr: Ocr }, prog: Prog): Promise<Result> {
+export async function scanAll(accts: Acct[], opt: { geo: boolean; ocr: Ocr; ocrMax: number }, prog: Prog): Promise<Result> {
   const res: Result = { rows: [], docs: [], folders: new Set(), wilayah: [], teks: [] }, jobs: Job[] = []
   for (const a of accts.filter(x => x.on)) {
     const ids = a.folders.split('\n').map(folderId).filter(Boolean); if (!ids.length) ids.push('root')
@@ -106,7 +106,7 @@ export async function scanAll(accts: Acct[], opt: { geo: boolean; ocr: Ocr }, pr
   await Promise.all(Array(4).fill(0).map(async () => {
     while (q.length) {
       const j = q.shift()!
-      try { j.k === 'img' ? await procImg(j, res, opt.ocr) : await procDoc(j, res, opt.ocr) } catch (e: any) { res.rows.push(base(j, { lat: '', lon: '', berkoordinat: 'TIDAK', status_koordinat: 'Error', error: String(e.message || e) })) }
+      try { j.k === 'img' ? await procImg(j, res, opt.ocr) : await procDoc(j, res, opt.ocr, opt.ocrMax) } catch (e: any) { res.rows.push(base(j, { lat: '', lon: '', berkoordinat: 'TIDAK', status_koordinat: 'Error', error: String(e.message || e) })) }
       prog(`Memproses ${++done}/${jobs.length}: ${j.f.name}`, (done / jobs.length) * 60)
     }
   }))

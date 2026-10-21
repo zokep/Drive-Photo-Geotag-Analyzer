@@ -7,7 +7,6 @@ import { tcoords, setCoord, applyOcr, extractRegion, isRel, rawJpegs, ocrCanvas,
 pdfjs.GlobalWorkerOptions.workerSrc = worker
 
 interface Img { label: string; ex: any; hal: string; ctx: string; cv?: HTMLCanvasElement | null; buf?: ArrayBuffer }
-const MAXOCR = 40
 
 function getObj(pg: any, name: string): Promise<any> {
   return new Promise(res => { try { (name.startsWith('g_') ? pg.commonObjs : pg.objs).get(name, res) } catch { res(null) } setTimeout(() => res(null), 4000) })
@@ -24,7 +23,7 @@ function toCanvas(img: any): HTMLCanvasElement | null {
 }
 const strip = (x: string) => x.replace(/<\/(w:p|a:p)>/g, '\n').replace(/<w:tab\/>/g, ' ').replace(/<[^>]+>/g, '')
 
-export async function procDoc(j: Job, res: Result, ocr: string) {
+export async function procDoc(j: Job, res: Result, ocr: string, max: number) {
   const ext = j.f.name.split('.').pop()!.toLowerCase(), b = await dl(j.a, j.f.id, false, j.f.gdoc)
   let meta: any = {}, note = '', small = 0, rawEx = 0, cnt = 0, cntC = 0, ocrN = 0
   const seen = new Set<string>(), who = { akun: j.a.email, folder: j.path, dokumen: j.f.name }
@@ -37,13 +36,14 @@ export async function procDoc(j: Job, res: Result, ocr: string) {
   const emit = async (m: Img) => {
     const r = exRow(j, m.ex, null, { sumber: 'Dalam dokumen', dokumen: j.f.name, nama: `${j.f.name} › ${m.label}`, halaman: m.hal, teks_sekitar: m.ctx.slice(0, 300) })
     if (r.berkoordinat !== 'YA') { const c = tcoords(m.ctx)[0]; if (c) setCoord(r, c[0], c[1], 'Dari teks sekitar foto') }
-    if ((m.cv || m.buf) && ocr !== 'off' && ocrN < MAXOCR && (ocr === 'all' || r.berkoordinat !== 'YA' || !r.waktu)) {
-      ocrN++
+    if ((m.cv || m.buf) && ocr !== 'off' && (ocr === 'all' || r.berkoordinat !== 'YA' || !r.waktu)) {
+      if (ocrN >= max) r.ocr_status = 'Dilewati: batas OCR per dokumen (' + max + ')'
+      else { ocrN++
       try {
         const t = m.cv ? await ocrCanvas(m.cv) : await ocrBuffer(m.buf!); applyOcr(r, t)
         for (const w of extractRegion(t)) res.wilayah.push({ ...who, sumber_teks: 'OCR foto', halaman: m.hal, ...w })
-      } catch (e: any) { r.ocr_error = String(e.message || e) }
-    }
+      } catch (e: any) { r.ocr_error = String(e.message || e); r.ocr_status = 'Gagal OCR' }
+    } }
     cnt++; if (r.berkoordinat === 'YA') cntC++; res.rows.push(r)
   }
   const exOf = async (buf: ArrayBuffer) => { try { return (await exifr.parse(buf, XO)) || null } catch { return null } }
