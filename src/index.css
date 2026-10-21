@@ -1,0 +1,18 @@
+:root{--bg:#f6f7f9;--c:#fff;--t:#1d2433;--m:#667;--b:#d9dde5;--a:#1a6dff}
+@media(prefers-color-scheme:dark){:root{--bg:#14171d;--c:#1d222b;--t:#e8ebf0;--m:#99a;--b:#323a47;--a:#5b9bff}}
+*{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif;background:var(--bg);color:var(--t)}
+.wrap{max-width:1300px;margin:auto;padding:16px}h1{font-size:20px;margin:0 0 12px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:12px}
+input,textarea,button{font:inherit;color:var(--t);background:var(--c);border:1px solid var(--b);border-radius:6px;padding:7px 10px}
+textarea{width:100%;height:56px;margin-top:6px}button{cursor:pointer}button.p,button.on{background:var(--a);color:#fff;border-color:var(--a)}
+button:disabled{opacity:.5}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.m{color:var(--m);font-size:12px}
+.acc{border:1px solid var(--b);border-radius:8px;padding:10px;margin-top:8px}
+.map{height:520px;border-radius:8px;border:1px solid var(--b)}
+.tw{overflow:auto;max-height:520px;border:1px solid var(--b);border-radius:8px}table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--b);text-align:left;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--c)}.bar{height:8px;background:var(--b);border-radius:4px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--a)}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.stat{flex:1;min-width:130px;border:1px solid var(--b);border-radius:8px;padding:10px;cursor:pointer;background:var(--c)}
+.stat b{display:block;font-size:22px}.stat.ok{border-left:4px solid #1a9a4a}.stat.no{border-left:4px solid #d93025}.stat.or{border-left:4px solid #e8590c}
+td.ok{color:#1a9a4a;font-weight:600}td.no{color:#d93025;font-weight:600}tr.no td:first-child{box-shadow:inset 3px 0 #d93025}tr.ya td:first-child{box-shadow:inset 3px 0 #1a9a4a}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 10px}select{font:inherit;color:var(--t);background:var(--c);border:1px solid var(--b);border-radius:6px;padding:7px}
