@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Acct, Ocr, Result, Row, scanAll, datasets } from './scan'
 import { exportXlsx, exportCsv, SHEETS } from './exporter'
 import MapView from './MapView'
@@ -132,5 +133,10 @@ function Inner() {
 
 export default function App() {
   if (!CID) return <div className="wrap"><div className="card">Isi <code>VITE_GOOGLE_CLIENT_ID</code> di file <code>.env</code> (lihat <code>.env.example</code>) lalu jalankan ulang.</div></div>
-  return <GoogleOAuthProvider clientId={CID}><Inner /></GoogleOAuthProvider>
+  return (
+    <>
+      <GoogleOAuthProvider clientId={CID}><Inner /></GoogleOAuthProvider>
+      <SpeedInsights />
+    </>
+  )
 }
